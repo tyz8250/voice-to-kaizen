@@ -75,6 +75,25 @@ Expected response:
 {"status":"ok"}
 ```
 
+## Docker Compose
+
+前提: Docker Desktopがインストールされていること
+Docker version 27.4.0
+Docker Compose version v2.31.0-desktop.2
+
+## PostgreSQLの起動
+
+```bash
+docker compose up -d
+docker compose ps
+```
+
+## PostgreSQLの停止
+
+```bash
+docker compose down
+```
+
 ## Docs
 
 - [Project brief](docs/project-brief.md)
