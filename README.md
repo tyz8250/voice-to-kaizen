@@ -75,6 +75,27 @@ Expected response:
 {"status":"ok"}
 ```
 
+### Database Health Check
+
+Start PostgreSQL first, then run the API server with `DATABASE_URL`.
+
+```bash
+docker compose up -d
+DATABASE_URL="postgres://voice_user:voice_password@localhost:5432/voice_to_kaizen?sslmode=disable" go run ./cmd/server
+```
+
+In another terminal:
+
+```bash
+curl http://localhost:8080/healthz/db
+```
+
+Expected response:
+
+```json
+{"status":"ok"}
+```
+
 ## Docker Compose
 
 前提: Docker Desktopがインストールされていること
@@ -98,3 +119,8 @@ docker compose down
 
 - [Project brief](docs/project-brief.md)
 - [v0.1 issues](docs/issues.md)
+
+## Related Articles
+
+- [GoでDATABASE_URLがわからなかったので、os.Getenv・環境変数・.envの関係を整理した](https://tyzo8250.hatenablog.jp/entry/2026/06/27/131902)
+- [Goでpgxpool.Newがわからなかったので、PostgreSQLの接続プールを整理した](https://tyzo8250.hatenablog.jp/entry/2026/06/28/132141)

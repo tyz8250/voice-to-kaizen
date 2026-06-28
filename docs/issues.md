@@ -35,14 +35,16 @@ curl http://localhost:8080/healthz
 
 ### Issue #3 Docker ComposeでPostgreSQLを起動する
 
-目的: ローカル開発用のPostgreSQLを用意する。
+目的: ローカル開発用のPostgreSQLをDocker Composeで起動することができるようにする。このIssueではGoアプリからのDB接続はまだ行わない。
 
 完了条件:
 
 - `docker-compose.yml` を作る
+- `.env` を作る
 - PostgreSQLコンテナを起動できる
 - DB名は `voice_to_kaizen`
 - user/password は `.env` で管理する
+- `docker compose ps` でpostgresが起動していることを確認できる
 - READMEに起動方法を書く
 
 確認:
