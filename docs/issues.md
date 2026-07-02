@@ -72,16 +72,77 @@ curl http://localhost:8080/healthz/db
 
 ## Milestone 1: Database and Auth
 
-### Issue #5 migrationを導入する
+### Issue #5-1 migrationツールを導入する
 
-目的: DBスキーマをコードで管理する。
+目的: migrationとDDLの基本を理解したうえで、`golang-migrate`を使うための土台を作る。
+
+実装前に進めること:
+
+1. migrationとは何かを理解する
+2. DDLとは何かを理解する
+3. `golang-migrate`の公式READMEを読む
+4. 理解した内容をもとに、#5-1のCodex指示を作る
+
+Codexへ依頼する実装範囲:
+
+- `golang-migrate`を導入する
+- `migrations` ディレクトリを作る
+- migrationを実行するためのコマンドをREADMEに書く
+- このIssueではテーブルをまだ作らない
 
 完了条件:
 
-- migrationツールを導入する
-- `migrations` ディレクトリを作る
-- `users`, `kaizen_requests`, `comments`, `status_histories`, `decision_logs` のDDLを作る
-- migrate up/down ができる
+- migrationが何のための仕組みか説明できる
+- DDLが何を表すか説明できる
+- `golang-migrate`の基本的な使い方を確認している
+- `golang-migrate`を実行できる
+- `migrations` ディレクトリが存在する
+
+### Issue #5-2 usersテーブルだけ作る
+
+目的: 最初のmigrationとして、`users` テーブルだけを作る。
+
+完了条件:
+
+- `users` テーブルを作成するup用DDLがある
+- `users` テーブルを削除するdown用DDLがある
+- `users` テーブルに必要なカラムが定義されている
+- このIssueでは他のテーブルを作らない
+
+### Issue #5-3 migrate up/downを確認する
+
+目的: migrationを進める操作と戻す操作を実際に確認する。
+
+完了条件:
+
+- migrate upで`users` テーブルを作成できる
+- PostgreSQL上で`users` テーブルが存在することを確認できる
+- migrate downで`users` テーブルを削除できる
+- PostgreSQL上で`users` テーブルが削除されたことを確認できる
+- 確認に使ったコマンドをREADMEに書く
+
+### Issue #5-4 kaizen_requestsテーブルを作る
+
+目的: 改善要望を保存する`kaizen_requests` テーブルを追加する。
+
+完了条件:
+
+- `kaizen_requests` テーブルを作成するup用DDLがある
+- `kaizen_requests` テーブルを削除するdown用DDLがある
+- `requester_id`と`owner_id`の`users`テーブルとの関係が定義されている
+- migrate up/downを実行できる
+
+### Issue #5-5 comments / status_histories / decision_logsを追加する
+
+目的: コメント、ステータス変更履歴、判断履歴を保存するテーブルを追加する。
+
+完了条件:
+
+- `comments` テーブルのup/down用DDLがある
+- `status_histories` テーブルのup/down用DDLがある
+- `decision_logs` テーブルのup/down用DDLがある
+- 各テーブルと`kaizen_requests`の関係が定義されている
+- migrate up/downを実行できる
 
 ### Issue #6 seedユーザーを作る
 
@@ -409,7 +470,11 @@ API: `GET /kaizen-requests/done`
 #2 /healthz
 #3 Docker Compose PostgreSQL
 #4 DB接続
-#5 migration
+#5-1 migrationツール導入
+#5-2 usersテーブル作成
+#5-3 migrate up/down確認
+#5-4 kaizen_requestsテーブル作成
+#5-5 関連テーブル追加
 #6 seed user
 #7 login
 #8 JWT

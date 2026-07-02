@@ -115,6 +115,28 @@ docker compose ps
 docker compose down
 ```
 
+## Database Migration
+
+このプロジェクトでは、golang-migrate をCLIツールとして利用します。
+
+migrationファイルは `migrations` ディレクトリに配置します。
+Goアプリの起動時に自動でmigrationは実行しません。
+DBの構造変更は、migrateコマンドを手動で実行して反映します。
+
+### Install golang-migrate
+
+macOS:
+
+```bash
+brew install golang-migrate
+```
+
+```bash
+migrate -version
+```
+
+環境変数の設定方法とmigrationコマンドは、[migrations/README.md](migrations/README.md)を参照してください。このIssueではコマンドを記載するだけで、テーブル作成やmigrate up/downはまだ行いません。
+
 ## Docs
 
 - [Project brief](docs/project-brief.md)
