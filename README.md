@@ -135,12 +135,52 @@ brew install golang-migrate
 migrate -version
 ```
 
-環境変数の設定方法とmigrationコマンドは、[migrations/README.md](migrations/README.md)を参照してください。このIssueではコマンドを記載するだけで、テーブル作成やmigrate up/downはまだ行いません。
+環境変数の設定方法とmigrationコマンドの詳細は、[migrations/README.md](migrations/README.md)を参照してください。Issue #5-1では手順の準備まで行い、Issue #5-2/#5-3でテーブル作成とup/down確認を行います。
+
+### Run users migration
+
+PostgreSQLを起動し、Mac側のターミナルへ `DATABASE_URL` を設定します。
+
+```bash
+docker compose up -d
+export DATABASE_URL='postgres://voice_user:voice_password@localhost:5432/voice_to_kaizen?sslmode=disable'
+```
+
+未適用のmigrationを実行します。
+
+```bash
+migrate -path migrations -database "$DATABASE_URL" up
+```
+
+`users` テーブルの作成結果を確認します。`docker compose exec` にはコンテナ名ではなくサービス名の `db` を指定します。
+
+```bash
+docker compose exec db psql -U voice_user -d voice_to_kaizen -c '\d users'
+```
+
+直前のmigrationを1つ戻します。
+
+```bash
+migrate -path migrations -database "$DATABASE_URL" down 1
+```
+
+テーブルが削除されたことを確認します。
+
+```bash
+docker compose exec db psql -U voice_user -d voice_to_kaizen -c '\dt'
+```
+
+確認後、開発を続ける場合は再度 `up` を実行して最新状態へ戻します。
+
+```bash
+migrate -path migrations -database "$DATABASE_URL" up
+```
 
 ## Docs
 
 - [Project brief](docs/project-brief.md)
 - [v0.1 issues](docs/issues.md)
+- [Issue #5-2 usersテーブル作成で学んだこと](docs/issue-05-2-users-migration-notes.md)
 
 ## Related Articles
 
