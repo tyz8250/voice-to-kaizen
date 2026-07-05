@@ -181,6 +181,8 @@ migrate -path migrations -database "$DATABASE_URL" up
 - [Project brief](docs/project-brief.md)
 - [v0.1 issues](docs/issues.md)
 - [Issue #5-2 usersテーブル作成で学んだこと](docs/issue-05-2-users-migration-notes.md)
+- [Database schema](docs/database.md)
+- [Issue #5-4 kaizen_requestsテーブル作成ログ](docs/issue-05-04.md)
 
 ## Related Articles
 
