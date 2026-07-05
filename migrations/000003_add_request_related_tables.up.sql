@@ -1,3 +1,5 @@
+BEGIN;
+
 CREATE TABLE comments (
   id SERIAL PRIMARY KEY,
   request_id INTEGER NOT NULL REFERENCES kaizen_requests(id),
@@ -24,3 +26,5 @@ CREATE TABLE decision_logs (
   reason TEXT,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+COMMIT;
