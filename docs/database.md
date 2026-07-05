@@ -18,7 +18,14 @@ erDiagram
         int owner_id FK "nullable"
         text title
         text description
+        text category
         text status
+        int impact
+        int urgency
+        int effort
+        int priority_score
+        text next_action "nullable"
+        date due_date "nullable"
         timestamp created_at
         timestamp updated_at
     }

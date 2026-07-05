@@ -1,8 +1,8 @@
-# Issue #5-4 kaizen_requestsテーブル作成ログ
+# Issue #5-4 kaizen_requestsテーブル再設計ログ
 
 ## 目的
 
-Issue #5-4では、改善要望を保存する `kaizen_requests` テーブルを追加します。
+Issue #5-4では、改善要望を保存する `kaizen_requests` テーブルを追加します。最初の設計で不足していたカラムとstatus値を見直し、Issue #5-4自体をやり直す形でversion 2を再設計しました。
 
 このテーブルは、改善要望を出した依頼者を `requester_id`、担当者を `owner_id` として保持し、それぞれ `users.id` を参照します。
 
@@ -47,6 +47,8 @@ migrations/000002_create_kaizen_requests_table.down.sql
 - down: `kaizen_requests` テーブルだけを削除する
 
 `users` テーブルはversion 1で作成しているため、version 2のdownでは削除しません。
+
+このプロジェクトはまだ開発初期で、`kaizen_requests` に保存済みデータがありません。そのため、後続の修正migrationは追加せず、version 2の定義を完成形へ書き直しました。
 
 ### 4. migrate upを実行した
 
@@ -157,15 +159,15 @@ kaizen_requests: 作成済み
 - SQLエラーの本当の原因が、表示位置の直前にあることもある
 - `CREATE TABLE` 内のカラム定義と制約定義はカンマで区切る
 
-## レビューで見つかった未解決点
+## レビューを受けた再設計
 
-### owner_idのNULL許可（対応済み）
+### owner_idをNULL許可にした
 
 担当者未設定の改善要望を扱えるように、`owner_id` はNULLを許可しました。値が入っている場合は、外部キー制約によって実在する `users.id` だけを登録できます。
 
-### 必要なカラムの不足
+### 必要なカラムをversion 2へ追加した
 
-プロジェクト設計にある次のカラムが、現在のmigrationにはまだありません。
+プロジェクト設計に合わせて、次のカラムをversion 2へ追加しました。
 
 - `category`
 - `impact`
@@ -175,9 +177,9 @@ kaizen_requests: 作成済み
 - `next_action`
 - `due_date`
 
-### status値の不一致
+### status値をv0.1設計へ揃えた
 
-現在のSQLは `open / in_progress / closed` を許可しています。一方、v0.1の設計では次の値を使用します。
+当初の `open / in_progress / closed` をやめ、v0.1の設計に合わせて次の値を使用します。
 
 - `captured`
 - `owner_needed`
@@ -186,16 +188,20 @@ kaizen_requests: 作成済み
 - `done`
 - `rejected`
 
-実装前に、migrationとプロジェクト設計のどちらを正とするか決めて統一します。
+プロジェクト設計を正として、version 2のCHECK制約を統一しました。
 
-### down確認
+### up/down確認
 
-Issue #5-4の完了条件にはmigrate up/downの確認があります。まだdown確認は行っていません。
-
-確認する内容:
+再設計したversion 2で、次の内容を確認しました。
 
 1. `down 1` で `kaizen_requests` だけが削除される
 2. `users` テーブルは残る
 3. 再度upすると `kaizen_requests` が作成される
 
-未解決点を修正してからup/downを再確認します。
+確認後は再度upし、開発DBをversion 2の最新状態へ戻しました。
+
+```text
+最終migration version: 2
+users: 存在する
+kaizen_requests: 存在する
+```

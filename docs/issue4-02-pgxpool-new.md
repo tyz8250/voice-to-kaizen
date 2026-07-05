@@ -136,3 +136,12 @@ return pgxpool.New(ctx, databaseURL)
 ただし、ここでも `ctx` が出てきます。
 
 `context` についてはまだ理解が浅いため、次回以降で整理していきたいと思います。
+
+## Issue #4でまだ理解が浅いこと
+
+- `context.Context` が何をしているのか
+- `context.WithTimeout` がなぜ必要なのか
+- Docker Compose内で `localhost` と `db` の違いがどう生まれるのか
+- GoコンテナからPostgreSQLコンテナへどう名前解決しているのか
+
+これらはIssue #5以降でも関係するため、後続で改めて整理する。

@@ -1,0 +1,7 @@
+CREATE TABLE comments (
+  id SERIAL PRIMARY KEY,
+  request_id INTEGER NOT NULL REFERENCES kaizen_requests(id),
+  author_id INTEGER NOT NULL REFERENCES users(id),
+  body TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
