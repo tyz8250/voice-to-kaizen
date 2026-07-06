@@ -176,6 +176,26 @@ docker compose exec db psql -U voice_user -d voice_to_kaizen -c '\dt'
 migrate -path migrations -database "$DATABASE_URL" up
 ```
 
+## Seeds data
+
+開発環境では、ログイン確認用の初期ユーザーをseed SQLで作成しています。
+
+以下のコマンドで実行できます。
+
+```bash
+docker compose exec -T db psql -U voice_user -d voice_to_kaizen < seeds/001_admin_user.sql
+```
+
+- [Admin user seed](seeds/001_admin_user.sql)
+
+同じseed SQLを複数回実行しても、`ON CONFLICT DO NOTHING` により重複レコードが挿入されません。
+
+### 初期ログインユーザー
+
+- メールアドレス: `admin@example.com`
+- パスワード: `admin123`
+- ロール: `admin`
+
 ## Docs
 
 - [Project brief](docs/project-brief.md)
