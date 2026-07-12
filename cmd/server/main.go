@@ -86,7 +86,6 @@ func handleDBHealthz(dbpool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		// DB接続プールがnilの場合
 		if dbpool == nil {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
 				"status": "error",
@@ -95,11 +94,9 @@ func handleDBHealthz(dbpool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		// DB接続確認用のコンテキストを作成。2秒でタイムアウト
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()
 
-		// DB接続を確認
 		if err := dbpool.Ping(ctx); err != nil {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
 				"status": "error",
@@ -109,34 +106,9 @@ func handleDBHealthz(dbpool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		var userID int
-		var email string
-		var passwordHash string
-		var role string
-
-		err := dbpool.QueryRow(
-			r.Context(),
-			`
-			SELECT id, email, password_hash, role
-			FROM users
-			WHERE email = $1
-			`,
-			email,
-		).Scan(
-			&userID,
-			&email,
-			&passwordHash,
-			&role,
-		)
-
-		if err != nil {
-			writeJSON(w, http.StatusUnauthorized, map[string]string{
-				"error": "invalid email or password",
-			})
-			return
-		}
-
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+		writeJSON(w, http.StatusOK, map[string]string{
+			"status": "ok",
+		})
 	}
 }
 
