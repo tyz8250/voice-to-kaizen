@@ -2,8 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"log"
 	"net/http"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -58,8 +61,19 @@ func handleLogin(dbpool *pgxpool.Pool) http.HandlerFunc {
 		)
 
 		if err != nil {
-			writeJSON(w, http.StatusUnauthorized, map[string]string{
-				"error": "invalid email or password",
+			// ユーザーが存在しない場合、またはDB接続に問題がある場合、401を返す
+			if errors.Is(err, pgx.ErrNoRows) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{
+					"error": "invalid email or password",
+				})
+				return
+			}
+
+			log.Printf("login user query failed: %v", err)
+
+			// その他のエラーは500を返す
+			writeJSON(w, http.StatusInternalServerError, map[string]string{
+				"error": "internal server error",
 			})
 			return
 		}
