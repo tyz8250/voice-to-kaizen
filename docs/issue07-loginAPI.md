@@ -319,9 +319,412 @@ bcrypt.CompareHashAndPassword
 
 ---
 
+## #7-6 JWTを発行する
+
+目的：ログインに成功したユーザーへJWTを発行し、レスポンスとして返す。
+
+### 完了条件
+
+- JWT生成用のライブラリを導入する
+- JWTへ`user_id`と`role`を含める
+- JWTに発行日時と有効期限を設定する
+- 環境変数`JWT_SECRET`を使って署名する
+- ログイン成功時にJWTを返す
+- JWT生成に失敗した場合は`500 Internal Server Error`を返す
+- curlでJWTが返ることを確認する
+
+---
+
+### #7-6-1 JWTライブラリを追加する
+
+JWTの生成には、`github.com/golang-jwt/jwt/v5`を使用する。
+
+プロジェクトのルートディレクトリで、以下を実行する。
+
+```bash
+go get github.com/golang-jwt/jwt/v5
+```
+
+実行後、`go.mod`と`go.sum`へ依存関係が追加される。
+
+---
+
+### #7-6-2 JWTの秘密鍵を用意する
+
+JWTの署名に使用する秘密鍵を、環境変数`JWT_SECRET`として設定する。
+
+`.env`へ追加する。
+
+```env
+JWT_SECRET=十分に長いランダムな文字列
+```
+
+秘密鍵はGitへ登録しない。
+
+`.env.example`には、実際の秘密鍵ではなく設定項目だけを書く。
+
+```env
+JWT_SECRET=your-jwt-secret
+```
+
+ランダムな文字列を生成する場合は、以下のコマンドを利用できる。
+
+```bash
+openssl rand -base64 32
+```
+
+`.env`を自動で読み込む仕組みがない場合は、サーバー起動前に環境変数を設定する。
+
+```bash
+export JWT_SECRET="生成した秘密鍵"
+```
+
+設定を確認する。
+
+```bash
+echo $JWT_SECRET
+```
+
+秘密鍵そのものは、ログやGitHubへ公開しない。
+
+---
+
+### #7-6-3 JWTに含める情報を定義する
+
+`cmd/server/jwt.go`を作成する。
+
+JWTには、以下の情報を含める。
+
+- `user_id`：ログインしたユーザーのID
+- `role`：ユーザーの権限
+- `iat`：JWTを発行した日時
+- `exp`：JWTの有効期限
+
+```go
+package main
+
+import (
+	"errors"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+)
+
+type LoginClaims struct {
+	UserID int    `json:"user_id"`
+	Role   string `json:"role"`
+	jwt.RegisteredClaims
+}
+```
+
+`jwt.RegisteredClaims`を埋め込むことで、JWTで標準的に使用される`iat`や`exp`を設定できる。
+
+---
+
+### #7-6-4 JWTを生成する関数を作る
+
+`jwt.go`へ、JWTを生成する関数を追加する。
+
+```go
+func generateJWT(userID int, role string, secret string) (string, error) {
+	if secret == "" {
+		return "", errors.New("JWT_SECRET is not set")
+	}
+
+	now := time.Now()
+
+	claims := LoginClaims{
+		UserID: userID,
+		Role:   role,
+		RegisteredClaims: jwt.RegisteredClaims{
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(24 * time.Hour)),
+		},
+	}
+
+	token := jwt.NewWithClaims(
+		jwt.SigningMethodHS256,
+		claims,
+	)
+
+	return token.SignedString([]byte(secret))
+}
+```
+
+### 処理の流れ
+
+```text
+ユーザーIDとroleを受け取る
+↓
+JWTへ入れるclaimsを作成する
+↓
+署名方式HS256を指定する
+↓
+JWT_SECRETで署名する
+↓
+JWT文字列を返す
+```
+
+### `generateJWT`の引数
+
+```go
+func generateJWT(userID int, role string, secret string)
+```
+
+- `userID`：DBから取得したユーザーID
+- `role`：DBから取得したユーザー権限
+- `secret`：JWTの署名に使用する秘密鍵
+
+### 戻り値
+
+```go
+(string, error)
+```
+
+JWTの生成に成功した場合は、JWT文字列を返す。
+
+失敗した場合は、空文字とエラーを返す。
+
+---
+
+### #7-6-5 ログイン成功時にJWTを生成する
+
+bcryptによるパスワード照合が成功した後に、JWTを生成する。
+
+`login.go`で環境変数を読み取るため、`os`をimportする。
+
+```go
+import "os"
+```
+
+bcrypt照合処理の後に、以下を追加する。
+
+```go
+jwtSecret := os.Getenv("JWT_SECRET")
+
+token, err := generateJWT(userID, role, jwtSecret)
+if err != nil {
+	log.Printf("failed to generate JWT: %v", err)
+
+	writeJSON(w, http.StatusInternalServerError, map[string]string{
+		"error": "internal server error",
+	})
+	return
+}
+```
+
+JWT生成に失敗した場合、利用者へ秘密鍵などの詳細は返さない。
+
+詳細なエラーはサーバー側のログへ記録し、レスポンスには一般的なエラーメッセージを返す。
+
+---
+
+### #7-6-6 成功レスポンスでJWTを返す
+
+これまで使用していた仮の成功レスポンスを変更する。
+
+変更前：
+
+```go
+writeJSON(w, http.StatusOK, map[string]string{
+	"status": "ok",
+	"email":  email,
+})
+```
+
+変更後：
+
+```go
+writeJSON(w, http.StatusOK, map[string]string{
+	"token": token,
+})
+```
+
+ログインに成功すると、以下のようなJSONが返る。
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+---
+
+### ログイン処理全体の流れ
+
+```text
+POST /login
+↓
+JSONをLoginRequestへdecode
+↓
+emailでusersテーブルを検索
+↓
+password_hashを取得
+↓
+bcryptでパスワードを照合
+↓
+user_idとroleをJWTへ入れる
+↓
+JWT_SECRETで署名
+↓
+JWTをレスポンスとして返す
+```
+
+---
+
+### #7-6-7 curlでJWTの発行を確認する
+
+最初にDockerを起動する。
+
+```bash
+docker compose up -d
+```
+
+DB接続を確認する。
+
+```bash
+curl -i http://localhost:8080/healthz/db
+```
+
+`200 OK`が返ることを確認する。
+
+次に、`DATABASE_URL`と`JWT_SECRET`を設定した状態でサーバーを起動する。
+
+```bash
+go run ./cmd/server
+```
+
+別のターミナルから、正しいemailとpasswordを送信する。
+
+```bash
+curl -i \
+  -X POST \
+  http://localhost:8080/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@example.com",
+    "password": "正しいパスワード"
+  }'
+```
+
+期待するレスポンス：
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+```
+
+```json
+{
+  "token": "JWT_TOKEN"
+}
+```
+
+間違ったパスワードも確認する。
+
+```bash
+curl -i \
+  -X POST \
+  http://localhost:8080/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@example.com",
+    "password": "wrong-password"
+  }'
+```
+
+期待するレスポンス：
+
+```http
+HTTP/1.1 401 Unauthorized
+```
+
+```json
+{
+  "error": "invalid email or password"
+}
+```
+
+---
+
+### 学んだこと
+
+#### JWTはユーザー情報を署名付きで表現する
+
+JWTには、ログインしたユーザーのIDやroleなどを含められる。
+
+ただし、JWTの中身は暗号化されているとは限らず、利用者から確認できる。
+
+そのため、以下のような秘密情報はJWTへ入れない。
+
+- パスワード
+- password_hash
+- JWT_SECRET
+- 個人情報や機密情報
+
+#### JWT_SECRETはコードへ直接書かない
+
+以下のように秘密鍵をコードへ直接記述すると、GitHubなどへ公開される可能性がある。
+
+```go
+// やらない
+secret := "my-secret-key"
+```
+
+環境変数から取得する。
+
+```go
+secret := os.Getenv("JWT_SECRET")
+```
+
+#### JWTには有効期限を設定する
+
+JWTを無期限にすると、流出した場合に長期間悪用される可能性がある。
+
+今回は、有効期限を24時間に設定する。
+
+```go
+ExpiresAt: jwt.NewNumericDate(now.Add(24 * time.Hour))
+```
+
+#### JWT発行はパスワード照合成功後に行う
+
+JWTは、emailとpasswordが正しいことを確認した後にだけ発行する。
+
+```text
+DB検索成功
+↓
+パスワード照合成功
+↓
+JWT発行
+```
+
+認証に失敗した利用者へJWTを発行してはいけない。
+
+---
+
+### 実装後の確認
+
+```bash
+go fmt ./...
+go test ./...
+git status
+```
+
+問題がなければcommitする。
+
+```bash
+git add .
+git commit -m "feat: issue JWT on successful login"
+```
+
+### 参考
+- [https://jwt.io/ja/introduction](https://jwt.io/ja/introduction)
+- [https://pkg.go.dev/github.com/golang-jwt/jwt/v5](https://pkg.go.dev/github.com/golang-jwt/jwt/v5)
+- [https://datatracker.ietf.org/doc/html/rfc7519](https://datatracker.ietf.org/doc/html/rfc7519)
+- [https://www.rfc-editor.org/info/rfc8725](https://www.rfc-editor.org/info/rfc8725)
+
 ## 今後の予定
 
-- #7-5 bcryptでパスワードを照合する
-- #7-6 JWTを発行する
 - #7-7 成功・失敗パターンをテストする
 - #7-8 email・passwordの空欄チェックを追加する
