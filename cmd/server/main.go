@@ -24,6 +24,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", handleHealthz)
 	mux.HandleFunc("/healthz/db", handleDBHealthz(dbpool))
+	mux.HandleFunc("/login", handleLogin(dbpool))
 
 	// 環境変数からポート番号を取得し、設定がない場合は8080をデフォルト値とする。
 	port := os.Getenv("PORT")
@@ -105,6 +106,33 @@ func handleDBHealthz(dbpool *pgxpool.Pool) http.HandlerFunc {
 				"error":  "database unavailable",
 			})
 			log.Printf("database health check failed: %v", err)
+			return
+		}
+
+		var userID int
+		var email string
+		var passwordHash string
+		var role string
+
+		err := dbpool.QueryRow(
+			r.Context(),
+			`
+			SELECT id, email, password_hash, role
+			FROM users
+			WHERE email = $1
+			`,
+			email,
+		).Scan(
+			&userID,
+			&email,
+			&passwordHash,
+			&role,
+		)
+
+		if err != nil {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{
+				"error": "invalid email or password",
+			})
 			return
 		}
 
