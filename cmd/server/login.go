@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -91,9 +92,21 @@ func handleLogin(dbpool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		// JWTシークレットを環境変数から取得
+		jwtSecret := os.Getenv("JWT_SECRET")
+
+		token, err := generateJWT(userID, role, jwtSecret)
+		if err != nil {
+			log.Printf("failed to generate JWT: %v", err)
+
+			writeJSON(w, http.StatusInternalServerError, map[string]string{
+				"error": "internal server error",
+			})
+			return
+		}
+
 		writeJSON(w, http.StatusOK, map[string]string{
-			"status": "ok",
-			"email":  email,
+			"token": token,
 		})
 	}
 }

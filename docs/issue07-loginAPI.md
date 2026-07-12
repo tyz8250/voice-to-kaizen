@@ -1,5 +1,12 @@
 # Issue #7 ログインAPIを作る
 
+## 進捗
+
+- #7-1〜#7-6 完了
+- ログイン成功時に、`user_id`と`role`を含むJWTを返すところまで実装済み
+- JWTの署名方式はHS256、有効期限は発行から24時間
+- 次の作業は#7-7（成功・失敗パターンのテスト）
+
 ## #7-1 ログインAPIの仕様を決める
 
 目的：実装前に、入力・出力・失敗パターンを決める。
@@ -291,7 +298,7 @@ git commit -m "feat: find user by email in login handler"
 - パスワードが間違っている場合は`401 Unauthorized`を返す
 - パスワードが正しい場合は次のJWT発行処理へ進める
 
-### 実装予定
+### 実装
 
 ```go
 err = bcrypt.CompareHashAndPassword(
@@ -323,15 +330,17 @@ bcrypt.CompareHashAndPassword
 
 目的：ログインに成功したユーザーへJWTを発行し、レスポンスとして返す。
 
+**ステータス：完了**
+
 ### 完了条件
 
-- JWT生成用のライブラリを導入する
-- JWTへ`user_id`と`role`を含める
-- JWTに発行日時と有効期限を設定する
-- 環境変数`JWT_SECRET`を使って署名する
-- ログイン成功時にJWTを返す
-- JWT生成に失敗した場合は`500 Internal Server Error`を返す
-- curlでJWTが返ることを確認する
+- [x] JWT生成用のライブラリを導入する
+- [x] JWTへ`user_id`と`role`を含める
+- [x] JWTに発行日時と有効期限を設定する
+- [x] 環境変数`JWT_SECRET`を使って署名する
+- [x] ログイン成功時にJWTを返す
+- [x] JWT生成に失敗した場合は`500 Internal Server Error`を返す
+- [x] curlでJWTが返ることを確認する
 
 ---
 
@@ -410,7 +419,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-type LoginClaims struct {
+type LoginClaim struct {
 	UserID int    `json:"user_id"`
 	Role   string `json:"role"`
 	jwt.RegisteredClaims
@@ -418,6 +427,8 @@ type LoginClaims struct {
 ```
 
 `jwt.RegisteredClaims`を埋め込むことで、JWTで標準的に使用される`iat`や`exp`を設定できる。
+
+実装では、型名を`LoginClaim`としている。
 
 ---
 
@@ -433,7 +444,7 @@ func generateJWT(userID int, role string, secret string) (string, error) {
 
 	now := time.Now()
 
-	claims := LoginClaims{
+	claims := LoginClaim{
 		UserID: userID,
 		Role:   role,
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -588,9 +599,11 @@ curl -i http://localhost:8080/healthz/db
 
 `200 OK`が返ることを確認する。
 
-次に、`DATABASE_URL`と`JWT_SECRET`を設定した状態でサーバーを起動する。
+次に、Mac側のターミナルで`DATABASE_URL`と`JWT_SECRET`を設定してサーバーを起動する。このプロジェクトは`.env`を自動では読み込まないため、環境変数を明示的に設定する。
 
 ```bash
+export DATABASE_URL='postgres://voice_user:voice_password@localhost:5432/voice_to_kaizen?sslmode=disable'
+export JWT_SECRET="$(openssl rand -base64 32)"
 go run ./cmd/server
 ```
 
@@ -603,7 +616,7 @@ curl -i \
   -H "Content-Type: application/json" \
   -d '{
     "email": "admin@example.com",
-    "password": "正しいパスワード"
+    "password": "admin123"
   }'
 ```
 
@@ -717,6 +730,15 @@ git status
 git add .
 git commit -m "feat: issue JWT on successful login"
 ```
+
+### #7-6 完了時の実装結果
+
+- `cmd/server/jwt.go`に`LoginClaim`と`generateJWT`を追加した
+- `github.com/golang-jwt/jwt/v5`を利用してHS256で署名した
+- JWTへ`user_id`、`role`、`iat`、`exp`を格納した
+- `cmd/server/login.go`でbcrypt照合成功後にJWTを生成し、`token`として返した
+- `JWT_SECRET`が空の場合やJWT生成に失敗した場合は、詳細をレスポンスへ出さず`500 Internal Server Error`を返した
+- `go test ./...`が成功することを確認した
 
 ### 参考
 - [https://jwt.io/ja/introduction](https://jwt.io/ja/introduction)

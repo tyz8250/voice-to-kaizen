@@ -196,6 +196,41 @@ docker compose exec -T db psql -U voice_user -d voice_to_kaizen < seeds/001_admi
 - パスワード: `admin123`
 - ロール: `admin`
 
+## Login API
+
+`POST /login`でメールアドレスとパスワードを照合し、認証に成功するとJWTを返します。
+
+サーバーを起動する前に、Mac側のターミナルで`DATABASE_URL`と`JWT_SECRET`を設定します。`JWT_SECRET`には、開発環境用の十分に長いランダムな文字列を指定してください。
+
+```bash
+export DATABASE_URL='postgres://voice_user:voice_password@localhost:5432/voice_to_kaizen?sslmode=disable'
+export JWT_SECRET=your-jwt-secret
+go run ./cmd/server
+```
+
+別のターミナルから、初期ログインユーザーでログインします。
+
+```bash
+curl -i \
+  -X POST \
+  http://localhost:8080/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@example.com",
+    "password": "admin123"
+  }'
+```
+
+認証に成功すると、`user_id`、`role`、発行日時、有効期限を含むJWTが返ります。JWTの有効期限は発行から24時間です。
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+メールアドレスが存在しない場合やパスワードが一致しない場合は、`401 Unauthorized`を返します。`JWT_SECRET`が設定されていない場合は、`500 Internal Server Error`を返します。
+
 ## Docs
 
 - [Project brief](docs/project-brief.md)
@@ -203,6 +238,8 @@ docker compose exec -T db psql -U voice_user -d voice_to_kaizen < seeds/001_admi
 - [Issue #5-2 usersテーブル作成で学んだこと](docs/issue-05-2-users-migration-notes.md)
 - [Database schema](docs/database.md)
 - [Issue #5-4 kaizen_requestsテーブル再設計ログ](docs/issue-05-04.md)
+- [Issue #7 ログインAPI](docs/issue07-loginAPI.md)
+- [Issue #7 ログインAPI実装での振り返り](docs/issue-07_ログインAPI振り返り.md)
 
 ## Related Articles
 
