@@ -24,6 +24,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", handleHealthz)
 	mux.HandleFunc("/healthz/db", handleDBHealthz(dbpool))
+	mux.HandleFunc("/login", handleLogin(dbpool))
 
 	// 環境変数からポート番号を取得し、設定がない場合は8080をデフォルト値とする。
 	port := os.Getenv("PORT")
@@ -85,7 +86,6 @@ func handleDBHealthz(dbpool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		// DB接続プールがnilの場合
 		if dbpool == nil {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
 				"status": "error",
@@ -94,11 +94,9 @@ func handleDBHealthz(dbpool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		// DB接続確認用のコンテキストを作成。2秒でタイムアウト
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()
 
-		// DB接続を確認
 		if err := dbpool.Ping(ctx); err != nil {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
 				"status": "error",
@@ -108,7 +106,9 @@ func handleDBHealthz(dbpool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+		writeJSON(w, http.StatusOK, map[string]string{
+			"status": "ok",
+		})
 	}
 }
 
