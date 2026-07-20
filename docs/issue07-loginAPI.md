@@ -746,7 +746,41 @@ git commit -m "feat: issue JWT on successful login"
 - [https://datatracker.ietf.org/doc/html/rfc7519](https://datatracker.ietf.org/doc/html/rfc7519)
 - [https://www.rfc-editor.org/info/rfc8725](https://www.rfc-editor.org/info/rfc8725)
 
+## 7-7 成功・失敗パターンをテストする
+
+- [x] テストケースを整理する
+
+  - ヘルスチェックAPI
+    - 正常系：GET /healthz にアクセスすると 200 OK を返す
+    - 異常系：GET以外のメソッドでは 405 Method Not Allowed を返す
+
+  - ログインAPI
+    - 正常系：登録済みemailと正しいpasswordの場合
+      - 200 OKを返す
+      - JWTを返す
+
+    - 異常系：登録されていないemailの場合
+      - 401 Unauthorizedを返す
+
+    - 異常系：passwordが一致しない場合
+      - 401 Unauthorizedを返す
+
+    - 異常系：emailが空欄の場合
+      - 400 Bad Requestを返す
+
+    - 異常系：passwordが空欄の場合
+      - 400 Bad Requestを返す
+
+    - 異常系：JSONが壊れている場合
+      - 400 Bad Requestを返す
+
+    - 異常系：DB処理で予期しないエラーが発生した場合
+      - 500 Internal Server Errorを返す
+
+- [ ] テストコードを書く
+
+- [ ] テストを実行する
+
 ## 今後の予定
 
-- #7-7 成功・失敗パターンをテストする
 - #7-8 email・passwordの空欄チェックを追加する
