@@ -11,12 +11,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )
 
 // ログインAPIの正常系を確認するテスト
 func TestHandleLoginReturnsJWTForValidCredentials(t *testing.T) {
+	jwtSecret := "test-jwt-secret"
+	t.Setenv("JWT_SECRET", jwtSecret)
+
 	// テスト用DBを作製
 	testDatabaseURL := os.Getenv("TEST_DATABASE_URL")
 
@@ -112,4 +116,45 @@ func TestHandleLoginReturnsJWTForValidCredentials(t *testing.T) {
 	if response.Token == "" {
 		t.Fatal("token is empty")
 	}
+
+	claims := &LoginClaim{}
+
+	token, err := jwt.ParseWithClaims(
+		response.Token, // ログインAPIから返されたJWT
+		claims,         // JWTの中身を入れる箱
+		// 秘密鍵を返す無名関数
+		func(token *jwt.Token) (any, error) {
+			return []byte(jwtSecret), nil
+		},
+	)
+
+	// 解析・署名検証が成功したか確認
+	if err != nil {
+		t.Fatalf("parse JWT: %v", err)
+	}
+
+	// tokenが有効か確認する
+	if !token.Valid {
+		t.Fatal("token is invalid")
+	}
+
+	// claims.UserID-->JWTから取り出したID
+	// userID（テスト用のユーザーID）
+	if claims.UserID != userID {
+		t.Errorf(
+			"user_id = %d, want %d",
+			claims.UserID,
+			userID,
+		)
+	}
+
+	// roleの確認
+	if claims.Role != "user" {
+		t.Errorf(
+			"role = %q, want %q",
+			claims.Role,
+			"user",
+		)
+	}
+
 }
