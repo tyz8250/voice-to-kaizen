@@ -173,3 +173,134 @@ func TestHandleLoginReturnsJWTForValidCredentials(t *testing.T) {
 	}
 
 }
+
+// emailは正しい、PWが間違っている場合のテスト
+/*
+登録済みemail
++
+間違ったpassword
+↓
+401 Unauthorized
+↓
+errorが期待どおり
+↓
+tokenは空
+*/
+func TestHandleLoginRejectWrongPassword(t *testing.T) {
+
+	testDatabaseURL := os.Getenv("TEST_DATABASE_URL")
+
+	if testDatabaseURL == "" {
+		t.Skip("TEST_DATABASE_URL is not set")
+	}
+
+	ctx := context.Background()
+
+	dbpool, err := pgxpool.New(ctx, testDatabaseURL)
+	if err != nil {
+		t.Fatalf("failed to create db pool: %v", err)
+	}
+	t.Cleanup(dbpool.Close)
+
+	if err := dbpool.Ping(ctx); err != nil {
+		t.Fatalf("connect to test database: %v", err)
+	}
+
+	password := "correct-password"
+	wrongPassword := "wrong-password"
+	name := "wrong Password Test User"
+	role := "member"
+	email := fmt.Sprintf(
+		"wrong-password-test-%d@example.com",
+		time.Now().UnixNano(),
+	)
+
+	// 正しいパスワードをハッシュ化する
+	passwordHash, err := bcrypt.GenerateFromPassword(
+		[]byte(password),
+		bcrypt.DefaultCost,
+	)
+	if err != nil {
+		t.Fatalf("generate password hash: %v", err)
+	}
+
+	var userID int
+
+	err = dbpool.QueryRow(
+		ctx,
+		`
+		INSERT INTO users (name, email, password_hash, role)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id
+	`,
+		name,
+		email,
+		string(passwordHash),
+		role,
+	).Scan(&userID)
+
+	if err != nil {
+		t.Fatalf("insert test user: %v", err)
+	}
+
+	t.Cleanup(func() {
+		_, err := dbpool.Exec(
+			context.Background(),
+			"DELETE FROM users WHERE id = $1",
+			userID,
+		)
+		if err != nil {
+			t.Errorf("delete test user: %v", err)
+		}
+	})
+
+	// ログインリクエストでは誤ったPWを入力する
+	requestBody := fmt.Sprintf(
+		`{"email": %q, "password": %q}`,
+		email,
+		wrongPassword,
+	)
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/login",
+		strings.NewReader(requestBody),
+	)
+	req.Header.Set("Content-Type", "application/json")
+
+	// handlerのレスポンスを記録する
+	recorder := httptest.NewRecorder()
+
+	handler := handleLogin(dbpool)
+	handler(recorder, req)
+
+	// handler実行後にレスポンスを確認する
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf(
+			"status code = %d, want %d, body = %s",
+			recorder.Code,
+			http.StatusUnauthorized,
+			recorder.Body.String(),
+		)
+	}
+
+	var response struct {
+		Error string `json:"error"`
+		Token string `json:"token"`
+	}
+
+	if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
+		t.Fatalf("decode response body: %v", err)
+	}
+
+	wantError := "invalid email or password"
+
+	if response.Error != wantError {
+		t.Errorf("error = %q, want %q", response.Error, wantError)
+	}
+
+	if response.Token != "" {
+		t.Errorf("token = %q, want empty string", response.Token)
+	}
+
+}
