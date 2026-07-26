@@ -41,6 +41,8 @@ func TestHandleLoginReturnsJWTForValidCredentials(t *testing.T) {
 	}
 
 	password := "test-password"
+	name := "Login Test User"
+	role := "member"
 
 	passwordHash, err := bcrypt.GenerateFromPassword(
 		[]byte(password),
@@ -61,20 +63,33 @@ func TestHandleLoginReturnsJWTForValidCredentials(t *testing.T) {
 	err = dbpool.QueryRow(
 		ctx,
 		`
-		INSERT INTO users (email, password_hash, role)
-		VALUES ($1, $2, $3)
+		INSERT INTO users (name,email, password_hash, role)
+		VALUES ($1, $2, $3, $4)
 		RETURNING id
 	`,
+		name,
 		email,
 		string(passwordHash),
-		"user",
+		role,
 	).Scan(&userID)
 
 	if err != nil {
 		t.Fatalf("insert test user: %v", err)
 	}
 
-	// 2. emailとpasswordを入れたリクエストを作る
+	// テスト終了時に作成したユーザを削除する
+	t.Cleanup(func() {
+		_, err := dbpool.Exec(
+			context.Background(),
+			"DELETE FROM users WHERE id = $1",
+			userID,
+		)
+		if err != nil {
+			t.Errorf("delete test user: %v", err)
+		}
+	})
+
+	// emailとpasswordを入れたリクエストを作る
 	requestBody := fmt.Sprintf(
 		`{"email": %q, "password": %q}`,
 		email,
@@ -149,11 +164,11 @@ func TestHandleLoginReturnsJWTForValidCredentials(t *testing.T) {
 	}
 
 	// roleの確認
-	if claims.Role != "user" {
+	if claims.Role != role {
 		t.Errorf(
 			"role = %q, want %q",
 			claims.Role,
-			"user",
+			role,
 		)
 	}
 
