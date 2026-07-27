@@ -304,3 +304,76 @@ func TestHandleLoginRejectWrongPassword(t *testing.T) {
 	}
 
 }
+
+func TestHandleLoginRejectsUnknownEmail(t *testing.T) {
+	// Arrange：テストDBへ接続する
+	// テスト用DBを作製
+	testDatabaseURL := os.Getenv("TEST_DATABASE_URL")
+
+	if testDatabaseURL == "" {
+		t.Skip("TEST_DATABASE_URL is not set") // 環境変数が設定されていない場合はスキップ（ログインAPIが正常か判断できないため）
+	}
+
+	ctx := context.Background() // DB接続用のコンテキスト（何も設定されていない）
+	dbpool, err := pgxpool.New(ctx, testDatabaseURL)
+	if err != nil {
+		t.Fatalf("failed to create db pool: %v", err)
+	}
+	defer dbpool.Close()
+
+	// Arrange：DBに存在しないemailを準備する
+	email := fmt.Sprintf("unknown-email-%d@example.com",
+		time.Now().UnixNano(),
+	)
+
+	password := "any-password"
+
+	// Arrange：ログインリクエストを作る
+	requestBody := fmt.Sprintf(
+		`{"email": %q, "password": %q}`,
+		email,
+		password,
+	)
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/login",
+		strings.NewReader(requestBody),
+	)
+	req.Header.Set("Content-Type", "application/json")
+
+	// Act：handlerを実行する
+
+	recoder := httptest.NewRecorder()
+	handler := handleLogin(dbpool)
+	handler(recoder, req)
+
+	// Assert：401・error・tokenを確認する
+	if recoder.Code != http.StatusUnauthorized {
+		t.Fatalf(
+			"status code = %d, want %d, body = %s",
+			recoder.Code,
+			http.StatusUnauthorized,
+			recoder.Body.String(),
+		)
+	}
+
+	var response struct {
+		Error string `json:"error"`
+		Token string `json:"token"`
+	}
+
+	if err := json.NewDecoder(recoder.Body).Decode(&response); err != nil {
+		t.Fatalf("decode response body: %v", err)
+	}
+
+	wantError := "invalid email or password"
+
+	if response.Error != wantError {
+		t.Errorf("error = %q, want %q", response.Error, wantError)
+	}
+
+	if response.Token != "" {
+		t.Errorf("token = %q, want empty string", response.Token)
+	}
+}
