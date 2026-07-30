@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -375,5 +376,130 @@ func TestHandleLoginRejectsUnknownEmail(t *testing.T) {
 
 	if response.Token != "" {
 		t.Errorf("token = %q, want empty string", response.Token)
+	}
+}
+
+func TestHandleLoginRejectsMissingJWTSecret(t *testing.T) {
+	// Arrange：テストDBへ接続する
+	testDatabaseURL := os.Getenv("TEST_DATABASE_URL")
+
+	if testDatabaseURL == "" {
+		t.Skip("TEST_DATABASE_URL is not set") // 環境変数が設定されていない場合はスキップ（ログインAPIが正常か判断できないため）
+	}
+
+	ctx := context.Background() // DB接続用のコンテキスト（何も設定されていない）
+	dbpool, err := pgxpool.New(ctx, testDatabaseURL)
+	if err != nil {
+		t.Fatalf("failed to create db pool: %v", err)
+	}
+	defer dbpool.Close()
+
+	// Arrange：JWT_SECRETを空にする
+	t.Setenv("JWT_SECRET", "")
+
+	// Arrange：正しいパスワードをハッシュ化する
+	password := "correct-password"
+
+	passwordHash, err := bcrypt.GenerateFromPassword(
+		[]byte(password),
+		bcrypt.DefaultCost,
+	)
+	if err != nil {
+		t.Fatalf("generate password hash: %v", err)
+	}
+
+	// Arrange：テストユーザーをDBへ登録する
+	name := "Missing JWT Secret Test User"
+	role := "member"
+
+	email := fmt.Sprintf(
+		"missing-jwt-secret-%d@example.com",
+		time.Now().UnixNano(),
+	)
+
+	var userID int
+
+	err = dbpool.QueryRow(
+		ctx,
+		`
+		INSERT INTO users (name, email, password_hash, role)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id
+	`,
+		name,
+		email,
+		string(passwordHash),
+		role,
+	).Scan(&userID)
+
+	if err != nil {
+		t.Fatalf("insert test user: %v", err)
+	}
+	// Cleanup：ユーザー削除を予約する
+	t.Cleanup(func() {
+		_, err := dbpool.Exec(
+			context.Background(),
+			"DELETE FROM users WHERE id = $1",
+			userID,
+		)
+		if err != nil {
+			t.Errorf("delete test user: %v", err)
+		}
+	})
+
+	// Arrange：正しいemailとpasswordのリクエストを作る
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/login",
+		bytes.NewBufferString(fmt.Sprintf(
+			`{"email": %q, "password": %q}`,
+			email,
+			password,
+		)),
+	)
+	req.Header.Set("Content-Type", "application/json")
+
+	// Act：レスポンスを受け取る箱を作る
+	recorder := httptest.NewRecorder()
+
+	// Act：ログインhandlerを作って実行する
+	handler := handleLogin(dbpool)
+	handler(recorder, req)
+	// Assert：500を確認する
+	if recorder.Code != http.StatusInternalServerError {
+		t.Fatalf(
+			"status code = %d, want %d, body = %s",
+			recorder.Code,
+			http.StatusInternalServerError,
+			recorder.Body.String(),
+		)
+	}
+
+	// Assert：JSONをresponseへデコードする
+	var response struct {
+		Error string `json:"error"`
+		Token string `json:"token"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	// Assert：errorを確認する
+	wantError := "failed to generate token"
+
+	if response.Error != wantError {
+		t.Errorf(
+			"error = %q, want %q",
+			response.Error,
+			wantError,
+		)
+	}
+
+	// Assert：tokenが空か確認する
+	if response.Token != "" {
+		t.Errorf(
+			"token = %q, want empty string",
+			response.Token,
+		)
 	}
 }
