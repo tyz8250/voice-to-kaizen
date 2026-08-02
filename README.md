@@ -229,7 +229,7 @@ curl -i \
 }
 ```
 
-メールアドレスが存在しない場合やパスワードが一致しない場合は、`401 Unauthorized`を返します。`JWT_SECRET`が設定されていない場合は、`500 Internal Server Error`を返します。
+メールアドレスが存在しない場合やパスワードが一致しない場合は、`401 Unauthorized`を返します。emailまたはpasswordが空の場合は、DBを検索せず`400 Bad Request`を返します。`JWT_SECRET`が設定されていない場合は、`500 Internal Server Error`を返します。
 
 ## Docs
 

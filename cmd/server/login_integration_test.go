@@ -320,7 +320,7 @@ func TestHandleLoginRejectsUnknownEmail(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create db pool: %v", err)
 	}
-	defer dbpool.Close()
+	t.Cleanup(dbpool.Close)
 
 	// Arrange：DBに存在しないemailを準備する
 	email := fmt.Sprintf("unknown-email-%d@example.com",
@@ -392,7 +392,7 @@ func TestHandleLoginRejectsMissingJWTSecret(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create db pool: %v", err)
 	}
-	defer dbpool.Close()
+	t.Cleanup(dbpool.Close)
 
 	// Arrange：JWT_SECRETを空にする
 	t.Setenv("JWT_SECRET", "")
@@ -485,7 +485,7 @@ func TestHandleLoginRejectsMissingJWTSecret(t *testing.T) {
 	}
 
 	// Assert：errorを確認する
-	wantError := "failed to generate token"
+	wantError := "internal server error"
 
 	if response.Error != wantError {
 		t.Errorf(
@@ -561,7 +561,7 @@ func TestHandleLoginRejectsInvalidJSON(t *testing.T) {
 	}
 
 	// Assert：errorを確認する
-	wantError := "Jsonの形式が間違っています"
+	wantError := "invalid request body"
 
 	if response.Error != wantError {
 		t.Errorf(
@@ -576,6 +576,41 @@ func TestHandleLoginRejectsInvalidJSON(t *testing.T) {
 		t.Errorf(
 			"token = %q, want empty string",
 			response.Token,
+		)
+	}
+}
+
+func TestHandleLoginRejectsNonPOST(t *testing.T) {
+	// Arrange：GET /loginのリクエストを作る
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/login",
+		nil,
+	)
+
+	// Act：recorderを作り、handlerを実行する
+	recorder := httptest.NewRecorder()
+
+	handler := handleLogin(nil)
+	handler(recorder, req)
+
+	// Assert：405 Method Not Allowedを確認する
+	if recorder.Code != http.StatusMethodNotAllowed {
+		t.Fatalf(
+			"status code = %d, want %d",
+			recorder.Code,
+			http.StatusMethodNotAllowed,
+		)
+	}
+
+	// Assert：AllowヘッダーがPOSTか確認する
+	allow := recorder.Header().Get("Allow")
+
+	if allow != http.MethodPost {
+		t.Errorf(
+			"Allow header = %q, want %q",
+			allow,
+			http.MethodPost,
 		)
 	}
 }

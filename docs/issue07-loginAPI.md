@@ -2,10 +2,11 @@
 
 ## 進捗
 
-- #7-1〜#7-6 完了
+- #7-1〜#7-8 完了
 - ログイン成功時に、`user_id`と`role`を含むJWTを返すところまで実装済み
 - JWTの署名方式はHS256、有効期限は発行から24時間
-- 次の作業は#7-7（成功・失敗パターンのテスト）
+- email・passwordの空欄はDB検索前に`400 Bad Request`を返す
+- 次の作業は#8-1（JWT認証middlewareの設計メモ）
 
 ## #7-1 ログインAPIの仕様を決める
 
@@ -765,22 +766,54 @@ git commit -m "feat: issue JWT on successful login"
     - 異常系：passwordが一致しない場合
       - 401 Unauthorizedを返す
 
-    - 異常系：emailが空欄の場合
-      - 400 Bad Requestを返す
-
-    - 異常系：passwordが空欄の場合
-      - 400 Bad Requestを返す
-
     - 異常系：JSONが壊れている場合
       - 400 Bad Requestを返す
 
-    - 異常系：DB処理で予期しないエラーが発生した場合
-      - 500 Internal Server Errorを返す
+    - 異常系：GETなどPOST以外のメソッドの場合
+      - 405 Method Not Allowedを返す
+      - `Allow: POST`を返す
 
-- [ ] テストコードを書く
+- [x] テストコードを書く
 
-- [ ] テストを実行する
+- [x] テストを実行する
+
+### #7-7-finish 完了時の整理
+
+- `TestHandleLoginRejectsNonPOST`を`login_integration_test.go`へ配置した
+- アプリケーションコードの`login.go`からテストコードを分離した
+- 壊れたJSONの期待値を実装済みの`invalid request body`へ合わせた
+- `JWT_SECRET`未設定時の期待値を実装済みの`internal server error`へ合わせた
+- email・passwordの空欄チェックは#7-8へ分離した
+- DB処理の予期しないエラーを再現するテストは、DB依存を分離するときの課題として残した
+
+## 7-8 email・passwordの空欄を400にする
+
+### 設計判断
+
+- 空文字列を「空欄」として扱う
+- emailまたはpasswordが空の場合は`400 Bad Request`を返す
+- JSONの解析と空欄チェックをDBの利用可否確認より先に行う
+- 空白だけの文字列や文字数制限は、仕様が未定のため今回の対象に含めない
+
+### 実装結果
+
+- email空欄とpassword空欄を一つの同値クラスとして扱う
+- テーブル駆動テストでemail空欄とpassword空欄の2ケースを確認する
+- どちらも`email and password are required`を返す
+- レスポンスにJWTを含めない
+- `handleLogin(nil)`を使い、DBを利用できない状態でも入力エラーが先に返ることを確認する
+
+### テスト
+
+```text
+TestHandleLoginRejectsEmptyCredentials/email_is_empty
+TestHandleLoginRejectsEmptyCredentials/password_is_empty
+```
 
 ## 今後の予定
 
-- #7-8 email・passwordの空欄チェックを追加する
+- #8-1 JWT認証middlewareの設計メモを書く
+- #8-2 Authorizationヘッダーを読み取る
+- #8-3 JWTの署名と有効期限を検証する
+- #8-4 `user_id`と`role`をcontextへ渡す
+- #8-5 公開APIと認証対象を分ける

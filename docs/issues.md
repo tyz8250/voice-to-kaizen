@@ -161,12 +161,41 @@ API: `POST /login`
 
 目的: JWT認証の入口を作る。
 
+状態: 完了
+
 完了条件:
 
-- email/password でログインできる
-- 成功時にJWTを返す
-- 失敗時は401を返す
-- `password_hash` と照合する
+- [x] email/password でログインできる
+- [x] 成功時にJWTを返す
+- [x] 認証失敗時は401を返す
+- [x] `password_hash` と照合する
+- [x] 正常系と主要な失敗経路のテストがある
+- [x] PostgreSQLへ接続する結合テストを実行できる
+
+補足:
+
+- email・passwordの空欄チェックはIssue #7-8で追加済み
+- DBの予期しないエラーを再現するテストは、DB依存を置き換えられる構造を検討するときに扱う
+
+#### Issue #7-8 email・passwordの空欄を400にする
+
+目的: 認証失敗と入力不足を区別し、不完全なリクエストでDBを検索しないようにする。
+
+状態: 完了
+
+設計判断:
+
+- emailまたはpasswordが空の場合は`400 Bad Request`を返す
+- 空欄チェックはDB検索より前に行う
+- 入力エラーではJWTを発行しない
+
+完了条件:
+
+- [x] email空欄のテストがある
+- [x] password空欄のテストがある
+- [x] どちらも`400 Bad Request`を返す
+- [x] レスポンスにJWTが含まれない
+- [x] DB検索より前に処理を終了する
 
 ### Issue #8 JWT認証middlewareを作る
 
@@ -178,6 +207,70 @@ API: `POST /login`
 - 認証成功時に `user_id`, `role` をcontextへ入れる
 - 認証失敗時は401を返す
 - `/healthz` と `/login` は認証不要
+
+進め方: 一度に完成させず、設計判断1つと確認できる動作1つを小さなIssueとして積み上げる。
+
+#### Issue #8-1 JWT認証middlewareの設計メモを書く
+
+目的: 実装前に、認証・認可の責務とエラーの扱いを言葉にする。
+
+完了条件:
+
+- [ ] 解決したい問題を書く
+- [ ] JWTなし・不正・期限切れの場合の扱いを決める
+- [ ] `401 Unauthorized`と`403 Forbidden`の使い分けを決める
+- [ ] roleをJWTから読む案とDBから読む案を比較する
+- [ ] 採用案、捨てた案、弱点、確認方法を書く
+
+#### Issue #8-2 Authorizationヘッダーを読み取る
+
+目的: `Authorization: Bearer <token>`からtokenを安全に取り出す。
+
+完了条件:
+
+- [ ] 正しいBearer形式からtokenを取得できる
+- [ ] Authorizationヘッダーなしは401を返す
+- [ ] Bearer以外の形式は401を返す
+- [ ] tokenが空の場合は401を返す
+- [ ] 各分岐のテストがある
+
+#### Issue #8-3 JWTの署名と有効期限を検証する
+
+目的: 存在するだけでなく、信用できるJWTだけを受け入れる。
+
+完了条件:
+
+- [ ] 正しいJWTを受け入れる
+- [ ] 壊れたJWTは401を返す
+- [ ] 異なる秘密鍵で署名されたJWTは401を返す
+- [ ] 期限切れJWTは401を返す
+- [ ] HS256以外を受け入れない
+- [ ] 認証失敗時に後続handlerを呼ばない
+
+#### Issue #8-4 user_idとroleをcontextへ渡す
+
+目的: 認証済みユーザーの情報を後続handlerで利用できるようにする。
+
+完了条件:
+
+- [ ] JWTから`user_id`と`role`を取得する
+- [ ] `user_id`と`role`をcontextへ保存する
+- [ ] 後続handlerから値を取得できる
+- [ ] contextへ渡される値をテストで確認する
+
+#### Issue #8-5 公開APIと認証対象を分ける
+
+目的: 公開APIを維持しながら、今後の管理系APIへmiddlewareを適用できる状態にする。
+
+完了条件:
+
+- [ ] `/healthz`はJWTなしで利用できる
+- [ ] `/login`はJWTなしで利用できる
+- [ ] 認証対象handlerはJWTなしで401を返す
+- [ ] 有効なJWTでは後続handlerへ進む
+- [ ] READMEとIssue #8の設計メモを更新する
+
+補足: 実際の改善要望APIへmiddlewareを適用する作業はIssue #9で行う。
 
 ## Milestone 2: Kaizen Requests
 

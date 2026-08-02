@@ -5,9 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"net/http/httptest"
 	"os"
-	"testing"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -27,18 +25,25 @@ func handleLogin(dbpool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		// DB接続プールがnilの場合、Panicせずに`503 Service Unavailable`を返す
-		if dbpool == nil {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
-				"error": "database unavailable",
-			})
-			return
-		}
-
 		var req LoginRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{
 				"error": "invalid request body",
+			})
+			return
+		}
+
+		if req.Email == "" || req.Password == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{
+				"error": "email and password are required",
+			})
+			return
+		}
+
+		// DB接続プールがnilの場合、Panicせずに`503 Service Unavailable`を返す
+		if dbpool == nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
+				"error": "database unavailable",
 			})
 			return
 		}
@@ -110,40 +115,5 @@ func handleLogin(dbpool *pgxpool.Pool) http.HandlerFunc {
 		writeJSON(w, http.StatusOK, map[string]string{
 			"token": token,
 		})
-	}
-}
-
-func TestHandleLoginRejectsNonPOST(t *testing.T) {
-	// Arrange：GET /loginのリクエストを作る
-	req := httptest.NewRequest(
-		http.MethodGet,
-		"/login",
-		nil,
-	)
-
-	// Act：recorderを作り、handlerを実行する
-	recorder := httptest.NewRecorder()
-
-	handler := handleLogin(nil)
-	handler(recorder, req)
-
-	// Assert：405 Method Not Allowedを確認する
-	if recorder.Code != http.StatusMethodNotAllowed {
-		t.Fatalf(
-			"status code = %d, want %d",
-			recorder.Code,
-			http.StatusMethodNotAllowed,
-		)
-	}
-
-	// Assert：AllowヘッダーがPOSTか確認する
-	allow := recorder.Header().Get("Allow")
-
-	if allow != http.MethodPost {
-		t.Errorf(
-			"Allow header = %q, want %q",
-			allow,
-			http.MethodPost,
-		)
 	}
 }
